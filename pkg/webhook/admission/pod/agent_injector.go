@@ -37,7 +37,6 @@ const (
 	LoggerConfigMapKeyName         = "logger"
 	LoggerArgumentLogUrl           = "--log-url"
 	LoggerArgumentMethod           = "--method"
-	LoggerArgumentLocation         = "--location"
 	LoggerArgumentSourceUri        = "--source-uri"
 	LoggerArgumentMode             = "--log-mode"
 	LoggerArgumentInferenceService = "--inference-service"
@@ -178,7 +177,7 @@ func (ag *AgentInjector) InjectAgent(pod *corev1.Pod) error {
 	}
 	// Only inject if the logger required annotations are set
 	if injectLogger {
-		logMethod, ok := pod.ObjectMeta.Annotations[constants.LoggerInternalAnnotationKey]
+		logMethod, ok := pod.ObjectMeta.Annotations[constants.LoggerMethodInternalAnnotationKey]
 		if !ok {
 			logMethod = string(v1beta1.LoggerDefaultMethod)
 		}
@@ -186,11 +185,6 @@ func (ag *AgentInjector) InjectAgent(pod *corev1.Pod) error {
 		logUrl, ok := pod.ObjectMeta.Annotations[constants.LoggerSinkUrlInternalAnnotationKey]
 		if !ok {
 			logUrl = ag.loggerConfig.DefaultUrl
-		}
-
-		logLocation, ok := pod.ObjectMeta.Annotations[constants.LoggerStrategyLocationInternalAnnotationKey]
-		if !ok {
-			logLocation = logUrl
 		}
 
 		logMode, ok := pod.ObjectMeta.Annotations[constants.LoggerModeInternalAnnotationKey]
@@ -206,8 +200,6 @@ func (ag *AgentInjector) InjectAgent(pod *corev1.Pod) error {
 		loggerArgs := []string{
 			LoggerArgumentMethod,
 			logMethod,
-			LoggerArgumentMethod,
-			logLocation,
 			LoggerArgumentLogUrl,
 			logUrl,
 			LoggerArgumentSourceUri,

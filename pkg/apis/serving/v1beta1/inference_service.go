@@ -49,19 +49,14 @@ const (
 	LogResponse LoggerType = "response"
 )
 
-type LoggerStrategyMethod string
+type LoggerMethod string
 
-// LoggerStrategyMethod Enum
+// LoggerMethod Enum
 const (
-	HttpMethod LoggerStrategyMethod = "http"
-	S3Method   LoggerStrategyMethod = "s3"
+	HttpMethod LoggerMethod = "http"
+	S3Method   LoggerMethod = "s3"
 )
-const LoggerDefaultMethod LoggerStrategyMethod = HttpMethod
-
-type LoggerStrategy struct {
-	Method   LoggerStrategyMethod `json:"method"`
-	Location *string              `json:"location"`
-}
+const LoggerDefaultMethod = HttpMethod
 
 // LoggerSpec specifies optional payload logging available for all components
 type LoggerSpec struct {
@@ -77,8 +72,8 @@ type LoggerSpec struct {
 	Mode LoggerType `json:"mode,omitempty"`
 	// Matched metadata HTTP headers for propagating to inference logger cloud events.
 	// +optional
-	MetadataHeaders []string        `json:"metadataHeaders,omitempty"`
-	Strategy        *LoggerStrategy `json:"strategy,omitempty"`
+	MetadataHeaders []string      `json:"metadataHeaders,omitempty"`
+	Method          *LoggerMethod `json:"method,omitempty"`
 }
 
 // MetricsBackend enum

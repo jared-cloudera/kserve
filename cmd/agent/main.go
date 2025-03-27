@@ -273,13 +273,6 @@ func startLogger(workers int, logger *zap.SugaredLogger) *loggerArgs {
 		os.Exit(-1)
 	}
 
-	loggingStrategy := v1beta1.LoggerStrategy{
-		Method:   v1beta1.LoggerStrategyMethod(*logStrategy),
-		Location: logUrl,
-	}
-
-	logger.Errorw("JDS Logging strategy", "method", loggingStrategy.Method, "location", loggingStrategy.Location)
-
 	logUrlParsed, err := url.Parse(*logUrl)
 	if err != nil {
 		logger.Errorf("Malformed log-url %s", *logUrl)

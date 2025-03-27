@@ -61,17 +61,10 @@ func addLoggerAnnotations(logger *v1beta1.LoggerSpec, annotations map[string]str
 	if logger != nil {
 		annotations[constants.LoggerInternalAnnotationKey] = "true"
 
-		if logger.Strategy != nil {
-			var method = v1beta1.LoggerDefaultMethod
-			if logger.Strategy.Method != "" {
-				method = logger.Strategy.Method
-			}
-			annotations[constants.LoggerStrategyMethodInternalAnnotationKey] = string(method)
-
-			if logger.Strategy.Location != nil {
-				annotations[constants.LoggerStrategyLocationInternalAnnotationKey] = *logger.Strategy.Location
-			}
+		if logger.Method != nil {
+			annotations[constants.LoggerMethodInternalAnnotationKey] = string(*logger.Method)
 		}
+
 		if logger.URL != nil {
 			annotations[constants.LoggerSinkUrlInternalAnnotationKey] = *logger.URL
 		}
