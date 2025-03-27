@@ -8156,6 +8156,16 @@ spec:
                         - request
                         - response
                         type: string
+                      strategy:
+                        properties:
+                          location:
+                            type: string
+                          method:
+                            type: string
+                        required:
+                        - location
+                        - method
+                        type: object
                       url:
                         type: string
                     type: object
@@ -12608,6 +12618,16 @@ spec:
                         - request
                         - response
                         type: string
+                      strategy:
+                        properties:
+                          location:
+                            type: string
+                          method:
+                            type: string
+                        required:
+                        - location
+                        - method
+                        type: object
                       url:
                         type: string
                     type: object
@@ -25485,6 +25505,16 @@ spec:
                         - request
                         - response
                         type: string
+                      strategy:
+                        properties:
+                          location:
+                            type: string
+                          method:
+                            type: string
+                        required:
+                        - location
+                        - method
+                        type: object
                       url:
                         type: string
                     type: object

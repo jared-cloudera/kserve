@@ -3457,6 +3457,9 @@
           "description": "Specifies the scope of the loggers. \u003cbr /\u003e Valid values are: \u003cbr /\u003e - \"all\" (default): log both request and response; \u003cbr /\u003e - \"request\": log only request; \u003cbr /\u003e - \"response\": log only response \u003cbr /\u003e",
           "type": "string"
         },
+        "strategy": {
+          "type": "string"
+        },
         "url": {
           "description": "URL to send logging events",
           "type": "string"

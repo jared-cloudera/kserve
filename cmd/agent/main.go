@@ -62,6 +62,7 @@ var (
 	workers          = flag.Int("workers", 5, "Number of workers")
 	sourceUri        = flag.String("source-uri", "", "The source URI to use when publishing cloudevents")
 	logMode          = flag.String("log-mode", string(v1beta1.LogAll), "Whether to log 'request', 'response' or 'all'")
+	logStrategy      = flag.String("log-strategy", string(v1beta1.HttpMethod), "The strategy to use when logging")
 	inferenceService = flag.String("inference-service", "", "The InferenceService name to add as header to log events")
 	namespace        = flag.String("namespace", "", "The namespace to add as header to log events")
 	endpoint         = flag.String("endpoint", "", "The endpoint name to add as header to log events")
@@ -110,6 +111,8 @@ type config struct {
 type loggerArgs struct {
 	loggerType       v1beta1.LoggerType
 	logUrl           *url.URL
+	method           string
+	location         string
 	sourceUrl        *url.URL
 	inferenceService string
 	namespace        string
@@ -269,6 +272,13 @@ func startLogger(workers int, logger *zap.SugaredLogger) *loggerArgs {
 		logger.Errorf("Malformed log-mode %s", *logMode)
 		os.Exit(-1)
 	}
+
+	loggingStrategy := v1beta1.LoggerStrategy{
+		Method:   v1beta1.LoggerStrategyMethod(*logStrategy),
+		Location: logUrl,
+	}
+
+	logger.Errorw("JDS Logging strategy", "method", loggingStrategy.Method, "location", loggingStrategy.Location)
 
 	logUrlParsed, err := url.Parse(*logUrl)
 	if err != nil {

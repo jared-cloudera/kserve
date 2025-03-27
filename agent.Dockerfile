@@ -13,10 +13,13 @@ COPY pkg/    pkg/
 
 # Build
 RUN CGO_ENABLED=0 GOOS=linux go build -a -o agent ./cmd/agent
+RUN CGO_ENABLED=0 go install github.com/go-delve/delve/cmd/dlv@latest
 
 # Copy the inference-agent into a thin image
 FROM gcr.io/distroless/static:nonroot
 COPY third_party/ third_party/
 WORKDIR /ko-app
 COPY --from=builder /go/src/github.com/kserve/kserve/agent /ko-app/
-ENTRYPOINT ["/ko-app/agent"]
+COPY --from=builder /go/bin/dlv /ko-app/
+ENTRYPOINT ["/ko-app/dlv", "exec", "/ko-app/agent", "--headless", "--listen=:2345", "--api-version=2", "--accept-multiclient", "--"]
+
