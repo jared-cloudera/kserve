@@ -2738,22 +2738,14 @@ spec:
                           items:
                             type: string
                           type: array
+                        method:
+                          type: string
                         mode:
                           enum:
                             - all
                             - request
                             - response
                           type: string
-                        strategy:
-                          properties:
-                            location:
-                              type: string
-                            method:
-                              type: string
-                          required:
-                            - location
-                            - method
-                          type: object
                         url:
                           type: string
                       type: object
@@ -7200,22 +7192,14 @@ spec:
                           items:
                             type: string
                           type: array
+                        method:
+                          type: string
                         mode:
                           enum:
                             - all
                             - request
                             - response
                           type: string
-                        strategy:
-                          properties:
-                            location:
-                              type: string
-                            method:
-                              type: string
-                          required:
-                            - location
-                            - method
-                          type: object
                         url:
                           type: string
                       type: object
@@ -20087,22 +20071,14 @@ spec:
                           items:
                             type: string
                           type: array
+                        method:
+                          type: string
                         mode:
                           enum:
                             - all
                             - request
                             - response
                           type: string
-                        strategy:
-                          properties:
-                            location:
-                              type: string
-                            method:
-                              type: string
-                          required:
-                            - location
-                            - method
-                          type: object
                         url:
                           type: string
                       type: object
