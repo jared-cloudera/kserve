@@ -21,5 +21,5 @@ COPY third_party/ third_party/
 WORKDIR /ko-app
 COPY --from=builder /go/src/github.com/kserve/kserve/agent /ko-app/
 COPY --from=builder /go/bin/dlv /ko-app/
-ENTRYPOINT ["/ko-app/dlv", "exec", "/ko-app/agent", "--headless", "--listen=:2345", "--api-version=2", "--accept-multiclient", "--"]
-
+#ENTRYPOINT ["/ko-app/dlv", "exec", "/ko-app/agent", "--headless", "--listen=:2345", "--api-version=2", "--accept-multiclient", "--"]
+ENTRYPOINT ["/ko-app/agent"]
