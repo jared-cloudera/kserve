@@ -370,6 +370,28 @@ func (ag *AgentInjector) InjectAgent(pod *corev1.Pod) error {
 		})
 	}
 
+	// JDS
+	pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
+		Name: "logging-creds-vol",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: "miniocreds",
+			},
+		},
+	})
+
+	agentContainer.VolumeMounts = append(agentContainer.VolumeMounts, corev1.VolumeMount{
+		Name:      "logging-creds-vol",
+		MountPath: "/etc/secrets/logging-creds",
+		ReadOnly:  true,
+	})
+
+	agentContainer.VolumeMounts = append(agentContainer.VolumeMounts, corev1.VolumeMount{
+		Name:      "logging-creds-vol",
+		MountPath: "/etc/secrets/logging-creds",
+		ReadOnly:  true,
+	})
+
 	// Inject credentials
 	if err := ag.credentialBuilder.CreateSecretVolumeAndEnv(
 		pod.Namespace,
