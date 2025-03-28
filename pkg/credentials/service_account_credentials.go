@@ -304,3 +304,27 @@ func (c *CredentialBuilder) mountSecretCredential(secretName string, namespace s
 	}
 	return nil
 }
+
+func (c *CredentialBuilder) CreateLoggingSecretVolume(loggingSecretName string, pod *corev1.Pod, container *corev1.Container) {
+	loggingCredentials, err := c.clientset.CoreV1().Secrets(pod.Namespace).Get(context.TODO(), loggingSecretName, metav1.GetOptions{})
+	if err != nil {
+		log.Error(err, "Failed to find logging secret", "LoggingSecretName", loggingSecretName)
+		return
+	}
+	loggingCredentialsVolumeName := loggingCredentials.Name + "-vol"
+
+	pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
+		Name: loggingCredentialsVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: loggingCredentials.Name,
+			},
+		},
+	})
+
+	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+		Name:      loggingCredentialsVolumeName,
+		MountPath: "/etc/secrets/logging",
+		ReadOnly:  true,
+	})
+}

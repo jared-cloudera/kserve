@@ -18,6 +18,7 @@ RUN CGO_ENABLED=0 go install github.com/go-delve/delve/cmd/dlv@latest
 # Copy the inference-agent into a thin image
 #FROM gcr.io/distroless/static:nonroot
 FROM golang:1.23
+USER 1
 COPY third_party/ third_party/
 WORKDIR /ko-app
 COPY --from=builder /go/src/github.com/kserve/kserve/agent /ko-app/
