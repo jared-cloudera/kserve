@@ -386,12 +386,6 @@ func (ag *AgentInjector) InjectAgent(pod *corev1.Pod) error {
 		ReadOnly:  true,
 	})
 
-	agentContainer.VolumeMounts = append(agentContainer.VolumeMounts, corev1.VolumeMount{
-		Name:      "logging-creds-vol",
-		MountPath: "/etc/secrets/logging-creds",
-		ReadOnly:  true,
-	})
-
 	// Inject credentials
 	if err := ag.credentialBuilder.CreateSecretVolumeAndEnv(
 		pod.Namespace,
