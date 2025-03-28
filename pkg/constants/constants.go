@@ -79,8 +79,9 @@ const (
 
 // InferenceLogger Constants
 const (
-	LoggerCaBundleVolume  = "agent-ca-bundle"
-	LoggerCaCertMountPath = "/etc/tls/logger"
+	LoggerCaBundleVolume    = "agent-ca-bundle"
+	LoggerCaCertMountPath   = "/etc/tls/logger"
+	LoggerDefaultSecretName = "logger-credentials"
 )
 
 // InferenceService Annotations
@@ -107,6 +108,7 @@ var (
 	QueueProxyAggregatePrometheusMetricsPort    = "9088"
 	DefaultPodPrometheusPort                    = "9091"
 	NodeGroupAnnotationKey                      = KServeAPIGroupName + "/nodegroup"
+	LoggerSecretNameKey                         = KServeAPIGroupName + "/logger-secret-name"
 )
 
 // InferenceService Internal Annotations

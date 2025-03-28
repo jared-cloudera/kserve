@@ -382,8 +382,18 @@ func (ag *AgentInjector) InjectAgent(pod *corev1.Pod) error {
 	}
 
 	// JDS
-	log.Info("JDS BUILDING CREDS")
-	ag.credentialBuilder.CreateLoggingSecretVolume("logging-creds", pod, agentContainer)
+	if injectLogger {
+		logMethod, ok := pod.ObjectMeta.Annotations[constants.LoggerMethodInternalAnnotationKey]
+		if ok && v1beta1.LoggerMethod(logMethod) != v1beta1.LogMethodHttp {
+			log.Info("JDS BUILDING CREDS")
+			loggingSecretName := pod.ObjectMeta.Annotations[constants.LoggerSecretNameKey]
+			if loggingSecretName == "" {
+				loggingSecretName = constants.LoggerDefaultSecretName
+				log.Info("No logging secret name provided, using default of", loggingSecretName)
+			}
+			ag.credentialBuilder.CreateLoggingSecretVolume(loggingSecretName, pod, agentContainer)
+		}
+	}
 
 	// Add container to the spec
 	pod.Spec.Containers = append(pod.Spec.Containers, *agentContainer)

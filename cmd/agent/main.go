@@ -62,7 +62,7 @@ var (
 	workers          = flag.Int("workers", 5, "Number of workers")
 	sourceUri        = flag.String("source-uri", "", "The source URI to use when publishing cloudevents")
 	logMode          = flag.String("log-mode", string(v1beta1.LogAll), "Whether to log 'request', 'response' or 'all'")
-	method           = flag.String("method", string(v1beta1.HttpMethod), "The method to use when logging")
+	method           = flag.String("method", string(v1beta1.LogMethodHttp), "The method to use when logging")
 	inferenceService = flag.String("inference-service", "", "The InferenceService name to add as header to log events")
 	namespace        = flag.String("namespace", "", "The namespace to add as header to log events")
 	endpoint         = flag.String("endpoint", "", "The endpoint name to add as header to log events")
@@ -266,7 +266,7 @@ func startBatcher(logger *zap.SugaredLogger) *batcherArgs {
 func startLogger(workers int, logger *zap.SugaredLogger) *loggerArgs {
 	loggingMethod := v1beta1.LoggerMethod(*method)
 	switch loggingMethod {
-	case v1beta1.HttpMethod, v1beta1.S3Method:
+	case v1beta1.LogMethodHttp, v1beta1.LogMethodS3:
 	default:
 		logger.Errorf("Malformed method %s", *method)
 		os.Exit(-1)

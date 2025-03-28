@@ -53,10 +53,10 @@ type LoggerMethod string
 
 // LoggerMethod Enum
 const (
-	HttpMethod LoggerMethod = "http"
-	S3Method   LoggerMethod = "s3"
+	LogMethodHttp LoggerMethod = "http"
+	LogMethodS3   LoggerMethod = "s3"
 )
-const LoggerDefaultMethod = HttpMethod
+const LoggerDefaultMethod = LogMethodHttp
 
 // LoggerSpec specifies optional payload logging available for all components
 type LoggerSpec struct {
