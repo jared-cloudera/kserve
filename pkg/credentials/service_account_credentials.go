@@ -258,23 +258,39 @@ func (c *CredentialBuilder) loggerCredentialsSecret(pod *corev1.Pod) (*corev1.Se
 	return loggerCredentials, nil
 }
 
+func (c *CredentialBuilder) LoggerCredentialPath(pod *corev1.Pod) (string, error) {
+	loggerCredentialPath := pod.ObjectMeta.Annotations[constants.LoggerCredentialPathKey]
+	if loggerCredentialPath == "" {
+		loggerCredentialPath = constants.LoggerDefaultCredentialPath
+		log.Info("No logging credential path configured, using default of", loggerCredentialPath)
+	}
+	return loggerCredentialPath, nil
+}
+
+func (c *CredentialBuilder) LoggerCredentialFile(pod *corev1.Pod) (string, error) {
+	loggerCredentialFile := pod.ObjectMeta.Annotations[constants.LoggerCredentialFileKey]
+	if loggerCredentialFile == "" {
+		loggerCredentialFile = constants.LoggerDefaultCredentialFile
+		log.Info("No logging credential file provided, using default of", loggerCredentialFile)
+	}
+	return loggerCredentialFile, nil
+}
+
 func (c *CredentialBuilder) LoggerCredentialLocation(pod *corev1.Pod) (string, error) {
 	secret, err := c.loggerCredentialsSecret(pod)
 	if err != nil {
 		return "", err
 	}
+	path, err := c.LoggerCredentialPath(pod)
+	if err != nil {
+		return "", err
+	}
 
-	loggerCredentialPath := pod.ObjectMeta.Annotations[constants.LoggerCredentialPathKey]
-	loggerCredentialFile := pod.ObjectMeta.Annotations[constants.LoggerCredentialFileKey]
-	if loggerCredentialPath == "" {
-		loggerCredentialPath = constants.LoggerDefaultCredentialPath
-		log.Info("No logging credential path configured, using default of", loggerCredentialPath)
+	file, err := c.LoggerCredentialFile(pod)
+	if err != nil {
+		return "", err
 	}
-	if loggerCredentialFile == "" {
-		loggerCredentialFile = constants.LoggerDefaultCredentialFile
-		log.Info("No logging credential file provided, using default of", loggerCredentialFile)
-	}
-	return filepath.Join(loggerCredentialPath, secret.Name, loggerCredentialFile), nil
+	return filepath.Join(path, secret.Name, file), nil
 }
 
 func (c *CredentialBuilder) MountLoggerCredential(loggingSecretName string, pod *corev1.Pod, container *corev1.Container) {
@@ -299,9 +315,15 @@ func (c *CredentialBuilder) MountLoggerCredential(loggingSecretName string, pod 
 		},
 	})
 
+	loggerPath, err := c.LoggerCredentialPath(pod)
+	if err != nil {
+		log.Error(err, "Failed to get logger credential location")
+		return
+	}
+
 	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
 		Name:      loggingCredentialsVolumeName,
-		MountPath: c.LoggerCredentialLocation(loggerCredentials.Name, pod),
+		MountPath: filepath.Join(loggerPath, loggerCredentials.Name),
 		ReadOnly:  true,
 	})
 }
