@@ -33,6 +33,7 @@ import (
 type S3Provider struct {
 	Client     s3iface.S3API
 	Downloader s3manageriface.DownloadWithIterator
+	Uploader   s3manageriface.UploadWithIterator
 }
 
 var log = logf.Log.WithName("modelAgent")
@@ -46,6 +47,16 @@ type S3ObjectDownloader struct {
 	Bucket     string
 	Prefix     string
 	downloader s3manageriface.DownloadWithIterator
+}
+
+type S3ObjectUploader struct {
+	StorageUri string
+	Bucket     string
+	Prefix     string
+	uploader   s3manageriface.UploadWithIterator
+}
+
+func (m *S3Provider) UploadObject(storageUri string, bucket string, prefix string, object []byte) {
 }
 
 func (m *S3Provider) DownloadModel(modelDir string, modelName string, storageUri string) error {

@@ -19,6 +19,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
+	awsCreds "github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/kserve/kserve/pkg/credentials"
 	"gopkg.in/yaml.v3"
 	"net"
@@ -27,6 +31,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-logr/zapr"
@@ -309,6 +314,27 @@ func startLogger(workers int, logger *zap.SugaredLogger) (*loggerArgs, error) {
 				return nil, err
 			}
 			logger.Info("Loaded logger credentials file", "logCredentialsFile", logCredentialsFile)
+
+			awsConfig := &aws.Config{
+				Region:           aws.String("us-east-1"),
+				S3ForcePathStyle: aws.Bool(true),
+			}
+			awsConfig.WithCredentials(awsCreds.NewStaticCredentials(loggerCredentials.S3.S3AccessKeyIDName, loggerCredentials.S3.S3SecretAccessKeyName, ""))
+			awsConfig.Endpoint = aws.String(loggerCredentials.S3.S3Endpoint)
+
+			sess, err := session.NewSession(awsConfig)
+			s3Client := s3.New(sess)
+			object, err := s3Client.PutObject(&s3.PutObjectInput{
+				Bucket: aws.String("inference-logs"),
+				Key:    aws.String("test.txt"),
+				Body:   strings.NewReader("test"),
+			})
+			if err != nil {
+				logger.Error(err)
+				return nil, err
+			}
+			logger.Info("Successfully uploaded object to S3", "object", object)
+
 		}
 	}
 
