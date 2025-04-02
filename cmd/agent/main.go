@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"gopkg.in/yaml.v3"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -58,16 +59,17 @@ var (
 	configDir    = flag.String("config-dir", "/mnt/configs", "directory for model config files")
 	modelDir     = flag.String("model-dir", "/mnt/models", "directory for model files")
 	// logger flags
-	logUrl           = flag.String("log-url", "", "The URL to send request/response logs to")
-	workers          = flag.Int("workers", 5, "Number of workers")
-	sourceUri        = flag.String("source-uri", "", "The source URI to use when publishing cloudevents")
-	logMode          = flag.String("log-mode", string(v1beta1.LogAll), "Whether to log 'request', 'response' or 'all'")
-	method           = flag.String("method", string(v1beta1.LogMethodHttp), "The method to use when logging")
-	inferenceService = flag.String("inference-service", "", "The InferenceService name to add as header to log events")
-	namespace        = flag.String("namespace", "", "The namespace to add as header to log events")
-	endpoint         = flag.String("endpoint", "", "The endpoint name to add as header to log events")
-	component        = flag.String("component", "", "The component name (predictor, explainer, transformer) to add as header to log events")
-	metadataHeaders  = flag.StringSlice("metadata-headers", nil, "Allow list of headers that will be passed down as metadata")
+	logUrl             = flag.String("log-url", "", "The URL to send request/response logs to")
+	workers            = flag.Int("workers", 5, "Number of workers")
+	sourceUri          = flag.String("source-uri", "", "The source URI to use when publishing cloudevents")
+	logMode            = flag.String("log-mode", string(v1beta1.LogAll), "Whether to log 'request', 'response' or 'all'")
+	logMethod          = flag.String("log-logMethod", string(v1beta1.LogMethodHttp), "The logMethod to use when logging")
+	logCredentialsFile = flag.String("log-credentials", "", "The credentials file to use when logging")
+	inferenceService   = flag.String("inference-service", "", "The InferenceService name to add as header to log events")
+	namespace          = flag.String("namespace", "", "The namespace to add as header to log events")
+	endpoint           = flag.String("endpoint", "", "The endpoint name to add as header to log events")
+	component          = flag.String("component", "", "The component name (predictor, explainer, transformer) to add as header to log events")
+	metadataHeaders    = flag.StringSlice("metadata-headers", nil, "Allow list of headers that will be passed down as metadata")
 	// batcher flags
 	enableBatcher = flag.Bool("enable-batcher", false, "Enable request batcher")
 	maxBatchSize  = flag.String("max-batchsize", "32", "Max Batch Size")
@@ -111,7 +113,8 @@ type config struct {
 type loggerArgs struct {
 	loggerType       v1beta1.LoggerType
 	logUrl           *url.URL
-	method           string
+	logMethod        string
+	logCredentials   string
 	sourceUrl        *url.URL
 	inferenceService string
 	namespace        string
@@ -150,9 +153,12 @@ func main() {
 	}
 
 	var loggerArgs *loggerArgs
-	if *logUrl != "" {
-		logger.Info("Starting logger")
-		loggerArgs = startLogger(*workers, logger)
+	if *logUrl != "" || *logMethod != "" {
+		var err error
+		loggerArgs, err = startLogger(*workers, logger)
+		if err != nil {
+			logger.Warn("Error starting logger", zap.Error(err))
+		}
 	}
 
 	var batcherArgs *batcherArgs
@@ -263,13 +269,44 @@ func startBatcher(logger *zap.SugaredLogger) *batcherArgs {
 	}
 }
 
-func startLogger(workers int, logger *zap.SugaredLogger) *loggerArgs {
-	loggingMethod := v1beta1.LoggerMethod(*method)
+func startLogger(workers int, logger *zap.SugaredLogger) (*loggerArgs, error) {
+	loggingMethod := v1beta1.LoggerMethod(*logMethod)
 	switch loggingMethod {
 	case v1beta1.LogMethodHttp, v1beta1.LogMethodS3:
 	default:
-		logger.Errorf("Malformed method %s", *method)
+		logger.Errorf("Malformed logMethod %s", *logMethod)
 		os.Exit(-1)
+	}
+
+	if loggingMethod != v1beta1.LogMethodHttp {
+		logger.Info("Starting logger")
+		// Open the yaml credFile
+		if *logCredentialsFile != "" {
+			credFile, err := os.Open(*logCredentialsFile)
+			if err != nil {
+				logger.Errorw("Error opening logger credentials file:", err)
+				return nil, err
+			}
+			defer func(file *os.File) {
+				err := file.Close()
+				if err != nil {
+					logger.Errorw("Error closing logger credentials file:", err)
+				}
+			}(credFile)
+
+			credFileStat, err := credFile.Stat()
+			if err != nil {
+				logger.Errorw("Error getting logger credentials file stat:", err)
+			}
+			credBuf := make([]byte, credFileStat.Size())
+			_, err = credFile.Read(credBuf)
+			logCreds := make(map[string]string)
+			err = yaml.Unmarshal(credBuf, logCreds)
+			if err != nil {
+				return nil, err
+			}
+			logger.Info(logCreds)
+		}
 	}
 
 	loggingMode := v1beta1.LoggerType(*logMode)
@@ -301,7 +338,7 @@ func startLogger(workers int, logger *zap.SugaredLogger) *loggerArgs {
 	return &loggerArgs{
 		loggerType:       loggingMode,
 		logUrl:           logUrlParsed,
-		method:           *method,
+		logMethod:        *logMethod,
 		sourceUrl:        sourceUriParsed,
 		inferenceService: *inferenceService,
 		endpoint:         *endpoint,
@@ -310,7 +347,7 @@ func startLogger(workers int, logger *zap.SugaredLogger) *loggerArgs {
 		metadataHeaders:  *metadataHeaders,
 		certName:         *CaCertFile,
 		tlsSkipVerify:    *TlsSkipVerify,
-	}
+	}, nil
 }
 
 func startModelPuller(logger *zap.SugaredLogger) {

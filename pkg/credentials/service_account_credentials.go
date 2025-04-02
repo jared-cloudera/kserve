@@ -221,7 +221,7 @@ func (c *CredentialBuilder) CreateSecretVolumeAndEnv(namespace string, annotatio
 		if secretName, ok := annotations[c.config.StorageSecretNameAnnotation]; ok {
 			err := c.mountSecretCredential(secretName, namespace, container, volumes)
 			if err != nil {
-				log.Error(err, "Failed to amount the secret credentials", "secretName", secretName)
+				log.Error(err, "Failed to mount the secret credentials", "secretName", secretName)
 				return err
 			}
 			return nil
@@ -239,6 +239,44 @@ func (c *CredentialBuilder) CreateSecretVolumeAndEnv(namespace string, annotatio
 	return nil
 }
 
+func (c *CredentialBuilder) MountLoggerCredential(loggingSecretName string, pod *corev1.Pod, container *corev1.Container) {
+	loggingCredentials, err := c.clientset.CoreV1().Secrets(pod.Namespace).Get(context.TODO(), loggingSecretName, metav1.GetOptions{})
+	if err != nil {
+		if apierr.IsNotFound(err) {
+			log.Info("Logging credentials secret not found, skipping mounting logger credentials")
+			return
+		}
+		log.Error(err, "Failed to find logging credentials secret", "SecretName", loggingSecretName)
+		return
+	}
+	loggerCredentialPath := pod.ObjectMeta.Annotations[constants.LoggerCredentialPathKey]
+	loggerCredentialFile := pod.ObjectMeta.Annotations[constants.LoggerCredentialFileKey]
+	if loggerCredentialPath == "" {
+		loggerCredentialPath = constants.LoggerDefaultCredentialPath
+		log.Info("No logging credential path configured, using default of", loggerCredentialPath)
+	}
+	if loggerCredentialFile == "" {
+		loggerCredentialFile = constants.LoggerDefaultCredentialFile
+		log.Info("No logging credential file provided, using default of", loggerCredentialFile)
+	}
+
+	loggingCredentialsVolumeName := loggingCredentials.Name + "-vol"
+
+	pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
+		Name: loggingCredentialsVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: loggingCredentials.Name,
+			},
+		},
+	})
+
+	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+		Name:      loggingCredentialsVolumeName,
+		MountPath: "/etc/secrets/" + loggingCredentials.Name,
+		ReadOnly:  true,
+	})
+}
 func (c *CredentialBuilder) mountSecretCredential(secretName string, namespace string,
 	container *corev1.Container, volumes *[]corev1.Volume,
 ) error {
@@ -303,28 +341,4 @@ func (c *CredentialBuilder) mountSecretCredential(secretName string, namespace s
 		log.V(5).Info("Skipping unsupported secret", "Secret", secret.Name)
 	}
 	return nil
-}
-
-func (c *CredentialBuilder) CreateLoggingSecretVolume(loggingSecretName string, pod *corev1.Pod, container *corev1.Container) {
-	loggingCredentials, err := c.clientset.CoreV1().Secrets(pod.Namespace).Get(context.TODO(), loggingSecretName, metav1.GetOptions{})
-	if err != nil {
-		log.Error(err, "Failed to find logging secret", "LoggingSecretName", loggingSecretName)
-		return
-	}
-	loggingCredentialsVolumeName := loggingCredentials.Name + "-vol"
-
-	pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
-		Name: loggingCredentialsVolumeName,
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName: loggingCredentials.Name,
-			},
-		},
-	})
-
-	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
-		Name:      loggingCredentialsVolumeName,
-		MountPath: "/etc/secrets/logging",
-		ReadOnly:  true,
-	})
 }
