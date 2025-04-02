@@ -23,15 +23,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	cloudevents "github.com/cloudevents/sdk-go/v2"
+	cehttp "github.com/cloudevents/sdk-go/v2/protocol/http"
 	"github.com/kserve/kserve/pkg/credentials"
+	"go.uber.org/zap"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-
-	cloudevents "github.com/cloudevents/sdk-go/v2"
-	cehttp "github.com/cloudevents/sdk-go/v2/protocol/http"
-	"go.uber.org/zap"
 
 	"github.com/kserve/kserve/pkg/constants"
 )
@@ -206,7 +205,11 @@ func (w *Worker) logCloudEvent(work LogRequest) error {
 	}
 	fmt.Printf("Logging cloud event: %s\n", string(requestJson))
 
-	reqType := work.ReqType[strings.LastIndex(work.Url.String(), "."):]
+	end := strings.LastIndex(work.ReqType, ".")
+	if end == -1 {
+		return fmt.Errorf("failed to find end of req type: %s", work.ReqType)
+	}
+	reqType := work.ReqType[end+1:]
 	format := "json"
 	name := fmt.Sprintf("%s-%s.%s", work.Id, reqType, format)
 	err = UploadObjectToS3(w.Config, w.Log, work.Url, name, requestJson)
