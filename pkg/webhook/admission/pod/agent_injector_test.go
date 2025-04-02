@@ -850,7 +850,7 @@ func TestAgentInjector(t *testing.T) {
 				},
 			},
 		},
-		"DefaultLoggerConfig": {
+		"DefaultLogger": {
 			original: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "deployment",

@@ -19,21 +19,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	awsCreds "github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/kserve/kserve/pkg/credentials"
-	"gopkg.in/yaml.v3"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/go-logr/zapr"
@@ -86,7 +78,7 @@ var (
 	readinessProbeTimeout = flag.Duration("probe-period", -1, "run readiness probe with given timeout") //nolint: unused
 	// This creates an abstract socket instead of an actual file.
 	unixSocketPath = "@/kserve/agent.sock"
-	CaCertFile     = flag.String("logger-ca-cert-file", "service-ca.crt", "The logger CA certificate file")
+	CaCertFile     = flag.String("logger-ca-cert-file", "service-ca.crt", "The loggerConfig CA certificate file")
 	TlsSkipVerify  = flag.Bool("logger-tls-skip-verify", false, "Skip verification of TLS certificate")
 )
 
@@ -122,7 +114,7 @@ type loggerArgs struct {
 	loggerType       v1beta1.LoggerType
 	logUrl           *url.URL
 	logMethod        string
-	logCredentials   credentials.LoggerConfig // JDS make ptr
+	loggerConfig     *credentials.LoggerConfig
 	sourceUrl        *url.URL
 	inferenceService string
 	namespace        string
@@ -163,7 +155,7 @@ func main() {
 	var loggerArgs *loggerArgs
 	if *logUrl != "" || *logMethod != "" {
 		var err error
-		loggerArgs, err = startLogger(*workers, logger)
+		loggerArgs, err = startLogger(*workers, logCredentialsFile, logger)
 		if err != nil {
 			logger.Warn("Error starting logger", zap.Error(err))
 		}
@@ -277,76 +269,27 @@ func startBatcher(logger *zap.SugaredLogger) *batcherArgs {
 	}
 }
 
-func startLogger(workers int, logger *zap.SugaredLogger) (*loggerArgs, error) {
+func startLogger(workers int, logCredentialsFile *string, log *zap.SugaredLogger) (*loggerArgs, error) {
 	loggingMethod := v1beta1.LoggerMethod(*logMethod)
 	switch loggingMethod {
 	case v1beta1.LogMethodHttp, v1beta1.LogMethodS3:
 	default:
-		logger.Errorf("Malformed logMethod %s", *logMethod)
+		log.Errorf("Malformed logMethod %s", *logMethod)
 		os.Exit(-1)
 	}
 
-	logger.Info("Starting logger")
+	log.Info("Starting logger")
 
-	var loggerCredentials credentials.LoggerConfig
+	var loggerConfig *credentials.LoggerConfig
 
 	if loggingMethod != v1beta1.LogMethodHttp {
 		// Open the yaml credFile
 		if *logCredentialsFile != "" {
-			credFile, err := os.Open(*logCredentialsFile)
+			var err error
+			loggerConfig, err = kfslogger.GetLoggerConfig(*logCredentialsFile, log)
 			if err != nil {
-				logger.Errorw("Error opening logger credentials file:", err)
-				return nil, err
+				log.Errorw("Error getting logger credentials file", zap.Error(err))
 			}
-			defer func(file *os.File) {
-				err := file.Close()
-				if err != nil {
-					logger.Errorw("Error closing logger credentials file:", err)
-				}
-			}(credFile)
-
-			credFileStat, err := credFile.Stat()
-			if err != nil {
-				logger.Errorw("Error getting logger credentials file stat:", err)
-			}
-			credBuf := make([]byte, credFileStat.Size())
-			_, err = credFile.Read(credBuf)
-			err = yaml.Unmarshal(credBuf, &loggerCredentials)
-			if err != nil {
-				return nil, err
-			}
-			logger.Info("Loaded logger credentials file", "logCredentialsFile", logCredentialsFile)
-
-			awsConfig := &aws.Config{
-				Region:           aws.String("us-east-1"),
-				S3ForcePathStyle: aws.Bool(true),
-			}
-			awsConfig.WithCredentials(awsCreds.NewStaticCredentials(loggerCredentials.S3.S3AccessKeyIDName, loggerCredentials.S3.S3SecretAccessKeyName, ""))
-			awsConfig.Endpoint = aws.String(loggerCredentials.S3.S3Endpoint)
-
-			sess, err := session.NewSession(awsConfig)
-
-			// split logUrl into bucket and key, with optional s3 prefix
-			s3Uri := strings.TrimPrefix(*logUrl, string(storage.S3))
-			tokens := strings.SplitN(s3Uri, "/", 2)
-			bucket := tokens[0]
-			key := filepath.Join(tokens[1:]...)
-
-			now := time.Now().Nanosecond()
-			s3Client := s3.New(sess)
-
-			uploader := storage.S3ObjectUploader{
-				Bucket:   bucket,
-				Prefix:   key,
-				Uploader: s3manager.NewUploaderWithClient(s3Client, func(u *s3manager.Uploader) {}),
-			}
-			uploader.UploadObject(bucket, fmt.Sprintf("%s/%d-request", key, now), []byte("UploadObject worked"))
-			if err != nil {
-				logger.Error(err)
-				return nil, err
-			}
-			logger.Info("Successfully uploaded object to S3")
-
 		}
 	}
 
@@ -354,13 +297,13 @@ func startLogger(workers int, logger *zap.SugaredLogger) (*loggerArgs, error) {
 	switch loggingMode {
 	case v1beta1.LogAll, v1beta1.LogRequest, v1beta1.LogResponse:
 	default:
-		logger.Errorf("Malformed log-mode %s", *logMode)
+		log.Errorf("Malformed log-mode %s", *logMode)
 		os.Exit(-1)
 	}
 
 	logUrlParsed, err := url.Parse(*logUrl)
 	if err != nil {
-		logger.Errorf("Malformed log-url %s", *logUrl)
+		log.Errorf("Malformed log-url %s", *logUrl)
 		os.Exit(-1)
 	}
 
@@ -370,17 +313,17 @@ func startLogger(workers int, logger *zap.SugaredLogger) (*loggerArgs, error) {
 
 	sourceUriParsed, err := url.Parse(*sourceUri)
 	if err != nil {
-		logger.Errorf("Malformed source_uri %s", *sourceUri)
+		log.Errorw("Malformed source_uri %s", *sourceUri)
 		os.Exit(-1)
 	}
 
-	logger.Info("Starting the log dispatcher")
-	kfslogger.StartDispatcher(workers, logger)
+	log.Info("Starting the log dispatcher")
+	kfslogger.StartDispatcher(workers, loggerConfig, log)
 	return &loggerArgs{
 		loggerType:       loggingMode,
 		logUrl:           logUrlParsed,
 		logMethod:        *logMethod,
-		logCredentials:   loggerCredentials,
+		loggerConfig:     loggerConfig,
 		sourceUrl:        sourceUriParsed,
 		inferenceService: *inferenceService,
 		endpoint:         *endpoint,
@@ -463,65 +406,4 @@ func buildServer(port string, userPort int, loggerArgs *loggerArgs, batcherArgs 
 	}
 	composedHandler = drainer
 	return pkgnet.NewServer(":"+port, composedHandler), drainer.Drain
-}
-
-func GetLoggerConfig(log *zap.SugaredLogger) (*credentials.LoggerConfig, error) {
-	credFile, err := os.Open(*logCredentialsFile)
-	if err != nil {
-		return nil, err
-	}
-	defer func(file *os.File) {
-		err := file.Close()
-		if err != nil {
-			log.Infof("Error closing logger credentials file:", err)
-		}
-	}(credFile)
-
-	credFileStat, err := credFile.Stat()
-	if err != nil {
-		log.Errorw("Error getting logger credentials file stat:", err)
-	}
-	credBuf := make([]byte, credFileStat.Size())
-	_, err = credFile.Read(credBuf)
-
-	var loggerCredentials credentials.LoggerConfig
-	err = yaml.Unmarshal(credBuf, &loggerCredentials)
-	if err != nil {
-		return nil, err
-	}
-	log.Info("Loaded logger credentials file", "logCredentialsFile", logCredentialsFile)
-	return &loggerCredentials, nil
-}
-
-func UploadObjectToS3(loggerConfig *credentials.LoggerConfig, log *zap.SugaredLogger, logUrl *url.URL, objectName string, value []byte) error {
-	awsConfig := &aws.Config{
-		Region:           aws.String("us-east-1"),
-		S3ForcePathStyle: aws.Bool(true),
-	}
-	awsConfig.WithCredentials(awsCreds.NewStaticCredentials(loggerConfig.S3.S3AccessKeyIDName, loggerConfig.S3.S3SecretAccessKeyName, ""))
-	awsConfig.Endpoint = aws.String(loggerConfig.S3.S3Endpoint)
-
-	sess, err := session.NewSession(awsConfig)
-
-	// split logUrl into bucket and key, with optional s3 prefix
-	s3Uri := strings.TrimPrefix(logUrl.String(), string(storage.S3))
-	tokens := strings.SplitN(s3Uri, "/", 2)
-	bucket := tokens[0]
-	key := filepath.Join(tokens[1:]...)
-
-	now := time.Now().Nanosecond()
-	s3Client := s3.New(sess)
-
-	uploader := storage.S3ObjectUploader{
-		Bucket:   bucket,
-		Prefix:   key,
-		Uploader: s3manager.NewUploaderWithClient(s3Client, func(u *s3manager.Uploader) {}),
-	}
-	uploader.UploadObject(bucket, fmt.Sprintf(objectName, key, now), value)
-	if err != nil {
-		log.Error(err)
-		return err
-	}
-	log.Info("Successfully uploaded object to S3")
-	return nil
 }

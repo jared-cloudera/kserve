@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/kserve/kserve/pkg/credentials"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -62,7 +63,7 @@ func QueueLogRequest(req LogRequest) error {
 // NewWorker creates, and returns a new Worker object. Its only argument
 // is a channel that the worker can add itself to whenever it is done its
 // work.
-func NewWorker(id int, workerQueue chan chan LogRequest, logger *zap.SugaredLogger) Worker {
+func NewWorker(id int, workerQueue chan chan LogRequest, config *credentials.LoggerConfig, logger *zap.SugaredLogger) Worker {
 	// Create, and return the worker.
 	return Worker{
 		Log:         logger,
@@ -70,6 +71,7 @@ func NewWorker(id int, workerQueue chan chan LogRequest, logger *zap.SugaredLogg
 		Work:        make(chan LogRequest),
 		WorkerQueue: workerQueue,
 		QuitChan:    make(chan bool),
+		Config:      config,
 	}
 }
 
@@ -79,6 +81,7 @@ type Worker struct {
 	Work        chan LogRequest
 	WorkerQueue chan chan LogRequest
 	QuitChan    chan bool
+	Config      *credentials.LoggerConfig
 }
 
 func (w *Worker) sendCloudEvent(logReq LogRequest) error {
@@ -173,6 +176,10 @@ func (w *Worker) Start() {
 					w.Log.Error(err, "Failed to send cloud event, url: %s", work.Url.String())
 				}
 
+				if err := w.logCloudEvent(work); err != nil {
+					w.Log.Error(err, "Failed to log cloud event, url: %s", work.Url.String())
+				}
+
 			case <-w.QuitChan:
 				// We have been asked to stop.
 				w.Log.Infof("worker %d stopping\n", w.ID)
@@ -189,4 +196,32 @@ func (w *Worker) Stop() {
 	go func() {
 		w.QuitChan <- true
 	}()
+}
+
+func (w *Worker) logCloudEvent(work LogRequest) error {
+	/*
+		Url              *url.URL
+		Bytes            *[]byte
+		ContentType      string
+		ReqType          string
+		Id               string
+		SourceUri        *url.URL
+		InferenceService string
+		Namespace        string
+		Component        string
+		Endpoint         string
+		Metadata         map[string][]string
+		CertName         string
+		TlsSkipVerify    bool
+	*/
+	requestJson, err := json.Marshal(work)
+	if err != nil {
+		return fmt.Errorf("failed to marshal log request to json: %w", err)
+	}
+	fmt.Printf("Logging cloud event: %s\n", string(requestJson))
+	err = UploadObjectToS3(w.Config, w.Log, work.Url, work.Id, requestJson)
+	if err != nil {
+		return err
+	}
+	return nil
 }
