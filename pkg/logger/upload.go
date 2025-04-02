@@ -1,7 +1,6 @@
 package logger
 
 import (
-	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	awsCreds "github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -15,7 +14,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 func GetLoggerConfig(logCredentialsFile string, log *zap.SugaredLogger) (*credentials.LoggerConfig, error) {
@@ -62,15 +60,13 @@ func UploadObjectToS3(loggerConfig *credentials.LoggerConfig, log *zap.SugaredLo
 	bucket := tokens[0]
 	key := filepath.Join(tokens[1:]...)
 
-	now := time.Now().Nanosecond()
 	s3Client := s3.New(sess)
-
 	uploader := storage.S3ObjectUploader{
 		Bucket:   bucket,
 		Prefix:   key,
 		Uploader: s3manager.NewUploaderWithClient(s3Client, func(u *s3manager.Uploader) {}),
 	}
-	uploader.UploadObject(bucket, fmt.Sprintf(objectName, key, now), value)
+	uploader.UploadObject(bucket, objectName, value)
 	if err != nil {
 		log.Error(err)
 		return err

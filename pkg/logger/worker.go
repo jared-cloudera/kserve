@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	cehttp "github.com/cloudevents/sdk-go/v2/protocol/http"
@@ -219,7 +220,12 @@ func (w *Worker) logCloudEvent(work LogRequest) error {
 		return fmt.Errorf("failed to marshal log request to json: %w", err)
 	}
 	fmt.Printf("Logging cloud event: %s\n", string(requestJson))
-	err = UploadObjectToS3(w.Config, w.Log, work.Url, work.Id, requestJson)
+
+	// only keep the segment after the last decimal in req type
+	reqType := work.ReqType[strings.LastIndex(work.Url.String(), "."):]
+	format := "json"
+	name := fmt.Sprintf("%s-%s.%s", work.Id, reqType, format)
+	err = UploadObjectToS3(w.Config, w.Log, work.Url, name, requestJson)
 	if err != nil {
 		return err
 	}
