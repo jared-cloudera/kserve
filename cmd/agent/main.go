@@ -30,6 +30,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -323,11 +324,24 @@ func startLogger(workers int, logger *zap.SugaredLogger) (*loggerArgs, error) {
 			awsConfig.Endpoint = aws.String(loggerCredentials.S3.S3Endpoint)
 
 			sess, err := session.NewSession(awsConfig)
+
+			// split logUrl into bucket and key, with optional s3 prefix
+			s3Uri := strings.TrimPrefix(*logUrl, string(storage.S3))
+			logger.Info("s3 uri is", s3Uri)
+			tokens := strings.SplitN(s3Uri, "/", 2)
+			logger.Info("tokens are", tokens)
+			bucket := tokens[0]
+			logger.Info("bucket is", bucket)
+			key := filepath.Join(tokens[1:]...)
+			logger.Info("key is", key)
+			// key is all tokens[1:] joined with /
+
+			now := time.Now().Nanosecond()
 			s3Client := s3.New(sess)
 			object, err := s3Client.PutObject(&s3.PutObjectInput{
-				Bucket: aws.String("inference-logs"),
-				Key:    aws.String("test.txt"),
-				Body:   strings.NewReader("test"),
+				Bucket: aws.String(bucket),
+				Key:    aws.String(fmt.Sprintf("%s/%d-request", key, now)),
+				Body:   strings.NewReader("bucket/key split worked"),
 			})
 			if err != nil {
 				logger.Error(err)

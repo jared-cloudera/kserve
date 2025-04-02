@@ -12,7 +12,7 @@ COPY cmd/    cmd/
 COPY pkg/    pkg/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux go build -a -o agent ./cmd/agent
+RUN CGO_ENABLED=0 GOOS=linux go build -gcflags="all=-N -l" -o agent ./cmd/agent
 RUN CGO_ENABLED=0 go install github.com/go-delve/delve/cmd/dlv@latest
 
 # Copy the inference-agent into a thin image
