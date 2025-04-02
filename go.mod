@@ -29,6 +29,7 @@ require (
 	google.golang.org/api v0.220.0
 	google.golang.org/protobuf v1.36.4
 	gopkg.in/go-playground/validator.v9 v9.31.0
+	gopkg.in/yaml.v3 v3.0.1
 	istio.io/api v1.24.2
 	istio.io/client-go v1.24.2
 	k8s.io/api v0.32.1
@@ -149,7 +150,6 @@ require (
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.32.0 // indirect
 	k8s.io/gengo/v2 v2.0.0-20240911193312-2b36238f13e9 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect

@@ -63,7 +63,7 @@ var (
 	workers            = flag.Int("workers", 5, "Number of workers")
 	sourceUri          = flag.String("source-uri", "", "The source URI to use when publishing cloudevents")
 	logMode            = flag.String("log-mode", string(v1beta1.LogAll), "Whether to log 'request', 'response' or 'all'")
-	logMethod          = flag.String("log-logMethod", string(v1beta1.LogMethodHttp), "The logMethod to use when logging")
+	logMethod          = flag.String("log-method", string(v1beta1.LogMethodHttp), "The logMethod to use when logging")
 	logCredentialsFile = flag.String("log-credentials", "", "The credentials file to use when logging")
 	inferenceService   = flag.String("inference-service", "", "The InferenceService name to add as header to log events")
 	namespace          = flag.String("namespace", "", "The namespace to add as header to log events")

@@ -19,9 +19,6 @@ package pod
 import (
 	"encoding/json"
 	"fmt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -39,7 +36,8 @@ import (
 const (
 	LoggerConfigMapKeyName         = "logger"
 	LoggerArgumentLogUrl           = "--log-url"
-	LoggerArgumentMethod           = "--method"
+	LoggerArgumentMethod           = "--log-method"
+	LoggerCredentials              = "--log-credentials"
 	LoggerArgumentSourceUri        = "--source-uri"
 	LoggerArgumentMode             = "--log-mode"
 	LoggerArgumentInferenceService = "--inference-service"
@@ -200,6 +198,12 @@ func (ag *AgentInjector) InjectAgent(pod *corev1.Pod) error {
 		endpoint := pod.ObjectMeta.Labels[constants.KServiceEndpointLabel]
 		component := pod.ObjectMeta.Labels[constants.KServiceComponentLabel]
 
+		loggerCredentialsLocation, err := ag.credentialBuilder.LoggerCredentialLocation(pod)
+		if err != nil {
+			log.Error(err, "Failed to get logger credential location")
+			loggerCredentialsLocation = ""
+		}
+
 		loggerArgs := []string{
 			LoggerArgumentMethod,
 			logMethod,
@@ -209,6 +213,8 @@ func (ag *AgentInjector) InjectAgent(pod *corev1.Pod) error {
 			pod.ObjectMeta.Name,
 			LoggerArgumentMode,
 			logMode,
+			LoggerCredentials,
+			loggerCredentialsLocation,
 			LoggerArgumentInferenceService,
 			inferenceServiceName,
 			LoggerArgumentNamespace,
@@ -388,14 +394,13 @@ func (ag *AgentInjector) InjectAgent(pod *corev1.Pod) error {
 	if injectLogger {
 		loggerMethod, ok := pod.ObjectMeta.Annotations[constants.LoggerMethodInternalAnnotationKey]
 		if ok && v1beta1.LoggerMethod(loggerMethod) != v1beta1.LogMethodHttp {
-			log.Info("JDS BUILDING CREDS")
-			loggerSecretName := pod.ObjectMeta.Annotations[constants.LoggerSecretNameKey]
-			if loggerSecretName == "" {
-				loggerSecretName = constants.LoggerDefaultSecretName
-				log.Info("No logging secret name configured, using default of", loggerSecretName)
+			log.Info("JDS LoggerCredentialLocation")
+			credentialLocation, err := ag.credentialBuilder.LoggerCredentialLocation(pod)
+			if err != nil {
+				log.Error(err, "Failed to get logger credential location")
+				return err
 			}
-
-			ag.credentialBuilder.CreateLoggingSecretVolume(loggerSecretName, pod, agentContainer)
+			ag.credentialBuilder.MountLoggerCredential(credentialLocation, pod, agentContainer)
 		}
 	}
 
