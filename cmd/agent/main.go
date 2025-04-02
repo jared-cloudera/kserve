@@ -23,6 +23,7 @@ import (
 	awsCreds "github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/kserve/kserve/pkg/credentials"
 	"gopkg.in/yaml.v3"
 	"net"
@@ -121,7 +122,7 @@ type loggerArgs struct {
 	loggerType       v1beta1.LoggerType
 	logUrl           *url.URL
 	logMethod        string
-	logCredentials   credentials.LoggingConfig // JDS make ptr
+	logCredentials   credentials.LoggerConfig // JDS make ptr
 	sourceUrl        *url.URL
 	inferenceService string
 	namespace        string
@@ -287,7 +288,7 @@ func startLogger(workers int, logger *zap.SugaredLogger) (*loggerArgs, error) {
 
 	logger.Info("Starting logger")
 
-	var loggerCredentials credentials.LoggingConfig
+	var loggerCredentials credentials.LoggerConfig
 
 	if loggingMethod != v1beta1.LogMethodHttp {
 		// Open the yaml credFile
@@ -327,27 +328,24 @@ func startLogger(workers int, logger *zap.SugaredLogger) (*loggerArgs, error) {
 
 			// split logUrl into bucket and key, with optional s3 prefix
 			s3Uri := strings.TrimPrefix(*logUrl, string(storage.S3))
-			logger.Info("s3 uri is", s3Uri)
 			tokens := strings.SplitN(s3Uri, "/", 2)
-			logger.Info("tokens are", tokens)
 			bucket := tokens[0]
-			logger.Info("bucket is", bucket)
 			key := filepath.Join(tokens[1:]...)
-			logger.Info("key is", key)
-			// key is all tokens[1:] joined with /
 
 			now := time.Now().Nanosecond()
 			s3Client := s3.New(sess)
-			object, err := s3Client.PutObject(&s3.PutObjectInput{
-				Bucket: aws.String(bucket),
-				Key:    aws.String(fmt.Sprintf("%s/%d-request", key, now)),
-				Body:   strings.NewReader("bucket/key split worked"),
-			})
+
+			uploader := storage.S3ObjectUploader{
+				Bucket:   bucket,
+				Prefix:   key,
+				Uploader: s3manager.NewUploaderWithClient(s3Client, func(u *s3manager.Uploader) {}),
+			}
+			uploader.UploadObject(bucket, fmt.Sprintf("%s/%d-request", key, now), []byte("UploadObject worked"))
 			if err != nil {
 				logger.Error(err)
 				return nil, err
 			}
-			logger.Info("Successfully uploaded object to S3", "object", object)
+			logger.Info("Successfully uploaded object to S3")
 
 		}
 	}
@@ -465,4 +463,65 @@ func buildServer(port string, userPort int, loggerArgs *loggerArgs, batcherArgs 
 	}
 	composedHandler = drainer
 	return pkgnet.NewServer(":"+port, composedHandler), drainer.Drain
+}
+
+func GetLoggerConfig(log *zap.SugaredLogger) (*credentials.LoggerConfig, error) {
+	credFile, err := os.Open(*logCredentialsFile)
+	if err != nil {
+		return nil, err
+	}
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			log.Infof("Error closing logger credentials file:", err)
+		}
+	}(credFile)
+
+	credFileStat, err := credFile.Stat()
+	if err != nil {
+		log.Errorw("Error getting logger credentials file stat:", err)
+	}
+	credBuf := make([]byte, credFileStat.Size())
+	_, err = credFile.Read(credBuf)
+
+	var loggerCredentials credentials.LoggerConfig
+	err = yaml.Unmarshal(credBuf, &loggerCredentials)
+	if err != nil {
+		return nil, err
+	}
+	log.Info("Loaded logger credentials file", "logCredentialsFile", logCredentialsFile)
+	return &loggerCredentials, nil
+}
+
+func UploadObjectToS3(loggerConfig *credentials.LoggerConfig, log *zap.SugaredLogger, logUrl *url.URL, objectName string, value []byte) error {
+	awsConfig := &aws.Config{
+		Region:           aws.String("us-east-1"),
+		S3ForcePathStyle: aws.Bool(true),
+	}
+	awsConfig.WithCredentials(awsCreds.NewStaticCredentials(loggerConfig.S3.S3AccessKeyIDName, loggerConfig.S3.S3SecretAccessKeyName, ""))
+	awsConfig.Endpoint = aws.String(loggerConfig.S3.S3Endpoint)
+
+	sess, err := session.NewSession(awsConfig)
+
+	// split logUrl into bucket and key, with optional s3 prefix
+	s3Uri := strings.TrimPrefix(logUrl.String(), string(storage.S3))
+	tokens := strings.SplitN(s3Uri, "/", 2)
+	bucket := tokens[0]
+	key := filepath.Join(tokens[1:]...)
+
+	now := time.Now().Nanosecond()
+	s3Client := s3.New(sess)
+
+	uploader := storage.S3ObjectUploader{
+		Bucket:   bucket,
+		Prefix:   key,
+		Uploader: s3manager.NewUploaderWithClient(s3Client, func(u *s3manager.Uploader) {}),
+	}
+	uploader.UploadObject(bucket, fmt.Sprintf(objectName, key, now), value)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	log.Info("Successfully uploaded object to S3")
+	return nil
 }

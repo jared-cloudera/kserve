@@ -169,7 +169,6 @@ func GetProvider(providers map[Protocol]Provider, protocol Protocol) (Provider, 
 		providers[S3] = &S3Provider{
 			Client:     sessionClient,
 			Downloader: s3manager.NewDownloaderWithClient(sessionClient, func(d *s3manager.Downloader) {}),
-			Uploader:   s3manager.NewUploaderWithClient(sessionClient, func(d *s3manager.Uploader) {}),
 		}
 	case HTTPS:
 		httpsClient := &http.Client{}

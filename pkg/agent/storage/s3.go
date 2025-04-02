@@ -50,13 +50,25 @@ type S3ObjectDownloader struct {
 }
 
 type S3ObjectUploader struct {
-	StorageUri string
-	Bucket     string
-	Prefix     string
-	uploader   s3manageriface.UploadWithIterator
+	Bucket   string
+	Prefix   string
+	Uploader s3manageriface.UploadWithIterator
 }
 
-func (m *S3Provider) UploadObject(storageUri string, bucket string, prefix string, object []byte) {
+func (s *S3ObjectUploader) UploadObject(bucket string, prefix string, object []byte) {
+	err := s.Upload([]s3manager.BatchUploadObject{
+		{
+			Object: &s3manager.UploadInput{
+				Bucket: aws.String(bucket),
+				Key:    aws.String(prefix),
+				Body:   aws.ReadSeekCloser(strings.NewReader(string(object))),
+			},
+		},
+	})
+	if err != nil {
+		log.Error(err, "Failed to upload object", "object", string(object))
+		return
+	}
 }
 
 func (m *S3Provider) DownloadModel(modelDir string, modelName string, storageUri string) error {
@@ -148,8 +160,10 @@ func (s *S3ObjectDownloader) GetAllObjects(s3Svc s3iface.S3API) ([]s3manager.Bat
 
 func (s *S3ObjectDownloader) Download(objects []s3manager.BatchDownloadObject) error {
 	iter := &s3manager.DownloadObjectsIterator{Objects: objects}
-	if err := s.downloader.DownloadWithIterator(aws.BackgroundContext(), iter); err != nil {
-		return err
-	}
-	return nil
+	return s.downloader.DownloadWithIterator(aws.BackgroundContext(), iter)
+}
+
+func (s *S3ObjectUploader) Upload(objects []s3manager.BatchUploadObject) error {
+	iter := &s3manager.UploadObjectsIterator{Objects: objects}
+	return s.Uploader.UploadWithIterator(aws.BackgroundContext(), iter)
 }

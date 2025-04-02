@@ -64,16 +64,16 @@ type CredentialConfig struct {
 	StorageSecretNameAnnotation string        `json:"storageSecretNameAnnotation,omitempty"`
 }
 
-type LoggingConfig struct {
+type LoggerConfig struct {
 	S3  s3.S3Config   `json:"s3,omitempty" yaml:"s3,omitempty"`
 	GCS gcs.GCSConfig `json:"gcs,omitempty" yaml:"gcs,omitempty"`
 }
 
 type CredentialBuilder struct {
-	client        client.Client
-	clientset     kubernetes.Interface
-	config        CredentialConfig
-	loggingConfig LoggingConfig
+	client       client.Client
+	clientset    kubernetes.Interface
+	config       CredentialConfig
+	loggerConfig LoggerConfig
 }
 
 var log = logf.Log.WithName("CredentialBuilder")
