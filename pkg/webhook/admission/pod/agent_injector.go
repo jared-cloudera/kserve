@@ -198,10 +198,10 @@ func (ag *AgentInjector) InjectAgent(pod *corev1.Pod) error {
 		endpoint := pod.ObjectMeta.Labels[constants.KServiceEndpointLabel]
 		component := pod.ObjectMeta.Labels[constants.KServiceComponentLabel]
 
-		loggerCredentialsLocation, err := ag.credentialBuilder.LoggerCredentialLocation(pod)
+		loggerCredentialsFile, err := ag.credentialBuilder.LoggerCredentialFile(pod)
 		if err != nil {
 			log.Error(err, "Failed to get logger credential location")
-			loggerCredentialsLocation = ""
+			loggerCredentialsFile = ""
 		}
 
 		loggerArgs := []string{
@@ -214,7 +214,7 @@ func (ag *AgentInjector) InjectAgent(pod *corev1.Pod) error {
 			LoggerArgumentMode,
 			logMode,
 			LoggerCredentials,
-			loggerCredentialsLocation,
+			loggerCredentialsFile,
 			LoggerArgumentInferenceService,
 			inferenceServiceName,
 			LoggerArgumentNamespace,
@@ -394,13 +394,8 @@ func (ag *AgentInjector) InjectAgent(pod *corev1.Pod) error {
 	if injectLogger {
 		loggerMethod, ok := pod.ObjectMeta.Annotations[constants.LoggerMethodInternalAnnotationKey]
 		if ok && v1beta1.LoggerMethod(loggerMethod) != v1beta1.LogMethodHttp {
-			log.Info("JDS LoggerCredentialLocation")
-			credentialLocation, err := ag.credentialBuilder.LoggerCredentialLocation(pod)
-			if err != nil {
-				log.Error(err, "Failed to get logger credential location")
-				return err
-			}
-			ag.credentialBuilder.MountLoggerCredential(credentialLocation, pod, agentContainer)
+			log.Info("JDS MountLoggerCredential")
+			ag.credentialBuilder.MountLoggerCredential(pod, agentContainer)
 		}
 	}
 

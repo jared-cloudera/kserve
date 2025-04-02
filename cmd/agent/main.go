@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/kserve/kserve/pkg/credentials"
 	"gopkg.in/yaml.v3"
 	"net"
 	"net/http"
@@ -114,7 +115,7 @@ type loggerArgs struct {
 	loggerType       v1beta1.LoggerType
 	logUrl           *url.URL
 	logMethod        string
-	logCredentials   string
+	logCredentials   credentials.LoggingConfig // JDS make ptr
 	sourceUrl        *url.URL
 	inferenceService string
 	namespace        string
@@ -278,8 +279,11 @@ func startLogger(workers int, logger *zap.SugaredLogger) (*loggerArgs, error) {
 		os.Exit(-1)
 	}
 
+	logger.Info("Starting logger")
+
+	var loggerCredentials credentials.LoggingConfig
+
 	if loggingMethod != v1beta1.LogMethodHttp {
-		logger.Info("Starting logger")
 		// Open the yaml credFile
 		if *logCredentialsFile != "" {
 			credFile, err := os.Open(*logCredentialsFile)
@@ -300,12 +304,11 @@ func startLogger(workers int, logger *zap.SugaredLogger) (*loggerArgs, error) {
 			}
 			credBuf := make([]byte, credFileStat.Size())
 			_, err = credFile.Read(credBuf)
-			logCreds := make(map[string]string)
-			err = yaml.Unmarshal(credBuf, logCreds)
+			err = yaml.Unmarshal(credBuf, &loggerCredentials)
 			if err != nil {
 				return nil, err
 			}
-			logger.Info(logCreds)
+			logger.Info("Loaded logger credentials file", "logCredentialsFile", logCredentialsFile)
 		}
 	}
 
@@ -339,6 +342,7 @@ func startLogger(workers int, logger *zap.SugaredLogger) (*loggerArgs, error) {
 		loggerType:       loggingMode,
 		logUrl:           logUrlParsed,
 		logMethod:        *logMethod,
+		logCredentials:   loggerCredentials,
 		sourceUrl:        sourceUriParsed,
 		inferenceService: *inferenceService,
 		endpoint:         *endpoint,

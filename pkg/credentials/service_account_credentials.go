@@ -58,16 +58,22 @@ var (
 )
 
 type CredentialConfig struct {
-	S3                          s3.S3Config   `json:"s3,omitempty"`
-	GCS                         gcs.GCSConfig `json:"gcs,omitempty"`
+	S3                          s3.S3Config   `json:"s3,omitempty" yaml:"s3,omitempty"`
+	GCS                         gcs.GCSConfig `json:"gcs,omitempty" yaml:"gcs,omitempty"`
 	StorageSpecSecretName       string        `json:"storageSpecSecretName,omitempty"`
 	StorageSecretNameAnnotation string        `json:"storageSecretNameAnnotation,omitempty"`
 }
 
+type LoggingConfig struct {
+	S3  s3.S3Config   `json:"s3,omitempty" yaml:"s3,omitempty"`
+	GCS gcs.GCSConfig `json:"gcs,omitempty" yaml:"gcs,omitempty"`
+}
+
 type CredentialBuilder struct {
-	client    client.Client
-	clientset kubernetes.Interface
-	config    CredentialConfig
+	client        client.Client
+	clientset     kubernetes.Interface
+	config        CredentialConfig
+	loggingConfig LoggingConfig
 }
 
 var log = logf.Log.WithName("CredentialBuilder")
@@ -244,7 +250,7 @@ func (c *CredentialBuilder) loggerCredentialsSecret(pod *corev1.Pod) (*corev1.Se
 	loggerSecretName := pod.ObjectMeta.Annotations[constants.LoggerSecretNameKey]
 	if loggerSecretName == "" {
 		loggerSecretName = constants.LoggerDefaultSecretName
-		log.Info("No logging secret name configured, using default of", loggerSecretName)
+		log.Info("No logging secret name configured, using default of", "loggerSecretName", loggerSecretName)
 	}
 	loggerCredentials, err := c.clientset.CoreV1().Secrets(pod.Namespace).Get(context.TODO(), loggerSecretName, metav1.GetOptions{})
 	if err != nil {
@@ -252,7 +258,7 @@ func (c *CredentialBuilder) loggerCredentialsSecret(pod *corev1.Pod) (*corev1.Se
 			log.Info("Logging credentials secret not found, skipping mounting logger credentials")
 			return nil, err
 		}
-		log.Error(err, "Failed to find logging credentials secret", "SecretName", loggerSecretName)
+		log.Error(err, "Failed to find logging credentials secret", "loggerSecretName", loggerSecretName)
 		return nil, err
 	}
 	return loggerCredentials, nil
@@ -262,18 +268,23 @@ func (c *CredentialBuilder) LoggerCredentialPath(pod *corev1.Pod) (string, error
 	loggerCredentialPath := pod.ObjectMeta.Annotations[constants.LoggerCredentialPathKey]
 	if loggerCredentialPath == "" {
 		loggerCredentialPath = constants.LoggerDefaultCredentialPath
-		log.Info("No logging credential path configured, using default of", loggerCredentialPath)
+		log.Info("No logging credential path configured, using default", "loggerCredentialPath", loggerCredentialPath)
 	}
 	return loggerCredentialPath, nil
 }
 
 func (c *CredentialBuilder) LoggerCredentialFile(pod *corev1.Pod) (string, error) {
+	loggerCredentialLocation, err := c.LoggerCredentialLocation(pod)
+	if err != nil {
+		return "", err
+	}
+
 	loggerCredentialFile := pod.ObjectMeta.Annotations[constants.LoggerCredentialFileKey]
 	if loggerCredentialFile == "" {
 		loggerCredentialFile = constants.LoggerDefaultCredentialFile
-		log.Info("No logging credential file provided, using default of", loggerCredentialFile)
+		log.Info("No logging credential file provided, using default", "loggerCredentialFile", loggerCredentialFile)
 	}
-	return loggerCredentialFile, nil
+	return filepath.Join(loggerCredentialLocation, loggerCredentialFile), nil
 }
 
 func (c *CredentialBuilder) LoggerCredentialLocation(pod *corev1.Pod) (string, error) {
@@ -285,22 +296,13 @@ func (c *CredentialBuilder) LoggerCredentialLocation(pod *corev1.Pod) (string, e
 	if err != nil {
 		return "", err
 	}
-
-	file, err := c.LoggerCredentialFile(pod)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(path, secret.Name, file), nil
+	return filepath.Join(path, secret.Name), nil
 }
 
-func (c *CredentialBuilder) MountLoggerCredential(loggingSecretName string, pod *corev1.Pod, container *corev1.Container) {
-	loggerCredentials, err := c.clientset.CoreV1().Secrets(pod.Namespace).Get(context.TODO(), loggingSecretName, metav1.GetOptions{})
+func (c *CredentialBuilder) MountLoggerCredential(pod *corev1.Pod, container *corev1.Container) {
+	loggerCredentials, err := c.loggerCredentialsSecret(pod)
 	if err != nil {
-		if apierr.IsNotFound(err) {
-			log.Info("Logging credentials secret not found, skipping mounting logger credentials")
-			return
-		}
-		log.Error(err, "Failed to find logging credentials secret", "SecretName", loggingSecretName)
+		log.Error(err, "Failed to mount logger credentials")
 		return
 	}
 
