@@ -200,28 +200,12 @@ func (w *Worker) Stop() {
 }
 
 func (w *Worker) logCloudEvent(work LogRequest) error {
-	/*
-		Url              *url.URL
-		Bytes            *[]byte
-		ContentType      string
-		ReqType          string
-		Id               string
-		SourceUri        *url.URL
-		InferenceService string
-		Namespace        string
-		Component        string
-		Endpoint         string
-		Metadata         map[string][]string
-		CertName         string
-		TlsSkipVerify    bool
-	*/
 	requestJson, err := json.Marshal(work)
 	if err != nil {
 		return fmt.Errorf("failed to marshal log request to json: %w", err)
 	}
 	fmt.Printf("Logging cloud event: %s\n", string(requestJson))
 
-	// only keep the segment after the last decimal in req type
 	reqType := work.ReqType[strings.LastIndex(work.Url.String(), "."):]
 	format := "json"
 	name := fmt.Sprintf("%s-%s.%s", work.Id, reqType, format)
