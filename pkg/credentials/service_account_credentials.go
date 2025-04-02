@@ -65,8 +65,8 @@ type CredentialConfig struct {
 }
 
 type LoggerConfig struct {
-	S3  s3.S3Config   `json:"s3,omitempty" yaml:"s3,omitempty"`
-	GCS gcs.GCSConfig `json:"gcs,omitempty" yaml:"gcs,omitempty"`
+	S3  *s3.S3Config   `json:"s3,omitempty" yaml:"s3,omitempty"`
+	GCS *gcs.GCSConfig `json:"gcs,omitempty" yaml:"gcs,omitempty"`
 }
 
 type CredentialBuilder struct {

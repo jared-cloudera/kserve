@@ -159,6 +159,28 @@ func (w *Worker) sendCloudEvent(logReq LogRequest) error {
 	return nil
 }
 
+func (w *Worker) logCloudEvent(work LogRequest) error {
+	requestJson, err := json.Marshal(work)
+	if err != nil {
+		return fmt.Errorf("failed to marshal log request to json: %w", err)
+	}
+
+	end := strings.LastIndex(work.ReqType, ".")
+	if end == -1 {
+		return fmt.Errorf("failed to find end of req type: %s", work.ReqType)
+	}
+	reqType := work.ReqType[end+1:]
+	format := "json"
+	name := fmt.Sprintf("%s-%s.%s", work.Id, reqType, format)
+	switch work.Url.Scheme {
+	case "s3":
+		return UploadObjectToS3(w.Config, w.Log, work.Url, name, requestJson)
+	case "http", "https":
+		break
+	}
+	return nil
+}
+
 // This function "starts" the worker by starting a goroutine, that is
 // an infinite "for-select" loop.
 func (w *Worker) Start() {
@@ -196,25 +218,4 @@ func (w *Worker) Stop() {
 	go func() {
 		w.QuitChan <- true
 	}()
-}
-
-func (w *Worker) logCloudEvent(work LogRequest) error {
-	requestJson, err := json.Marshal(work)
-	if err != nil {
-		return fmt.Errorf("failed to marshal log request to json: %w", err)
-	}
-	fmt.Printf("Logging cloud event: %s\n", string(requestJson))
-
-	end := strings.LastIndex(work.ReqType, ".")
-	if end == -1 {
-		return fmt.Errorf("failed to find end of req type: %s", work.ReqType)
-	}
-	reqType := work.ReqType[end+1:]
-	format := "json"
-	name := fmt.Sprintf("%s-%s.%s", work.Id, reqType, format)
-	err = UploadObjectToS3(w.Config, w.Log, work.Url, name, requestJson)
-	if err != nil {
-		return err
-	}
-	return nil
 }
