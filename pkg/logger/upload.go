@@ -46,8 +46,8 @@ func GetLoggerConfig(logCredentialsFile string, log *zap.SugaredLogger) (*creden
 
 func UploadObjectToS3(loggerConfig *credentials.LoggerConfig, log *zap.SugaredLogger, logUrl *url.URL, objectName string, value []byte) error {
 	awsConfig := &aws.Config{
-		Region:           aws.String("us-east-1"),
-		S3ForcePathStyle: aws.Bool(true),
+		Region:           aws.String(loggerConfig.Region),
+		S3ForcePathStyle: aws.Bool(loggerConfig.S3ForcePathStyle),
 	}
 	awsConfig.WithCredentials(awsCreds.NewStaticCredentials(loggerConfig.S3.S3AccessKeyIDName, loggerConfig.S3.S3SecretAccessKeyName, ""))
 	awsConfig.Endpoint = aws.String(loggerConfig.S3.S3Endpoint)
